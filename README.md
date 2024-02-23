@@ -29,6 +29,8 @@ Posteriormente, el algoritmo almacena la información procesada en la carpeta de
 
 El algoritmo también emplea un sistema de imputación basado en vecinos cercanos para identificar patrones entre clientes y hacer inferencias. Esto permite la creación de parámetros que, sin generalizar a toda la población, usan un método de clusterización estratificada para segmentar a los clientes por características compartidas, siendo el tamaño del cliente y el subcanal las variables más influyentes en este proceso.
 
+![ICD por Estado](ICD/src/ICD_por_Estado.png)
+
 Con los grupos identificados, se establecen parámetros basados en variables medibles a través de los archivos `parquet`, tales como cantidad de frentes, presencia de competencia, duración de la encuesta y coordenadas. La ponderación de estas variables nos permite discernir qué encuestas reflejan fielmente la realidad.
 
 El resultado de este proceso es un dataframe que ofrece una visión completa sobre el desempeño de cada indicador, permitiéndonos filtrar la información para tomar decisiones basadas en datos confiables.
@@ -44,6 +46,8 @@ El **Algoritmo de Calidad** se ha convertido en un componente esencial por varia
 - **Optimización de la toma de decisiones:** Con datos de alta calidad, las decisiones basadas en la información recopilada son más precisas y fiables. Esto es crucial para el desarrollo estratégico y la planificación a largo plazo.
 
 - **Mejora continua:** El algoritmo permite una revisión constante de los procesos y estrategias de recopilación de datos, asegurando una mejora continua en la calidad de los datos recogidos.
+
+![ICD por Estado](ICD/src/ICD-Distribution.png)
 
 ## ¿Quién se beneficia del Algoritmo de Calidad?
 
