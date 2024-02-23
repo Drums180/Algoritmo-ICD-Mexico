@@ -1,12 +1,4 @@
----
-title: "Indice de Calidad"
-author: "David Dominguez - A01570975"
-date: "2023-09-14"
-output: html_document
----
-
 # Llamar Librerias
-```{r message=FALSE, warning=FALSE}
 library(dplyr)
 library(readr)
 library(readxl)
@@ -18,12 +10,10 @@ library(sf)
 library(httr)
 library(jsonlite)
 library(ggplot2)
-```
 
 # Carga de Base de Datos
 
 ## Quality Data
-```{r message=FALSE, warning=FALSE}
 setwd("fuentes_datos/")  # Establecer ruta de trabajo
 
 # Función para leer y combinar archivos de una carpeta
@@ -93,10 +83,8 @@ df_actual <- combine_files("actual/")
 df_session <- combine_files("session/")
 df_survey <- combine_files("survey/")
 df_scenes <- combine_files("scenes/")
-```
 
 ## Query Como Dato
-```{r}
 # Lista de todos los archivos Excel y CSV en el directorio
 files <- dir("fuentes_datos/comodato", pattern = "\\.xlsx$|\\.csv$", full.names = TRUE)
 
@@ -115,12 +103,8 @@ df_poc <- df_comodato %>%
   summarise(Total_Articulos = sum(`# de Articulos`, na.rm = TRUE)) %>%
   ungroup()
 
-# Verifica el resultado
-head(df_poc)
-```
 
 ## Master Clientes
-```{r message=FALSE, warning=FALSE}
 # Función para leer un archivo y limpiar nombres de columnas, aceptando tanto .xlsx como .csv
 read_and_clean <- function(file_path) {
   if (grepl("\\.xlsx$", file_path)) {
@@ -184,12 +168,7 @@ master_clientes <- clientes_unicos %>%
   left_join(mds[, c("codigo_cliente", "tamaño", "sub_canal_isscom", "modelo_de_servicio_ruta", "ruta_preventa_oficial", "zona...13", "territorio...14")], 
             by = c("customercode" = "codigo_cliente"))
 
-# Verificar el resultado
-head(master_clientes)
-```
-
 ## Parametros
-```{r}
 # Función para leer un archivo (Excel o CSV) y opcionalmente una hoja específica para Excel
 read_file_with_sheet <- function(file_path, sheet_name = NULL) {
   if (file.exists(paste0(file_path, ".xlsx"))) {
@@ -210,24 +189,15 @@ ruta_parametros <- "parametros"
 # Cargar la hoja "data" del archivo "parametros", buscando tanto .xlsx como .csv
 parametros_data <- read_file_with_sheet(ruta_parametros, "data")
 
-# Verificar la carga de datos
-head(parametros_data)
-```
-
 # Sabana de Analisis
 
 ## Tiempo
-```{r}
 df_survey <- df_survey %>%
   mutate(duration = `Duration(Sec)` / 60) %>%
   mutate(estatus = if_else(Status == "Complete", 1, 0))
 
-# Verificar los cambios
-head(df_survey)
-```
 
-## Coordenadas - ()
-```{r}
+## Coordenadas
 # Función del haversine para calcular distancia entre dos puntos de latitud y longitud
 haversine <- function(lon1, lat1, lon2, lat2) {
   R <- 6371000  # Radio de la Tierra en metros
@@ -271,13 +241,7 @@ outliers <- df_session$distance[df_session$distance < (Q1 - 1.5 * IQR) |
 # Imprimir valores atípicos
 print(outliers)
 
-
-# Verificar los cambios
-head(df_session)
-```
-
 ## Frentes - (CHECK)
-```{r}
 frentes_df <- df_actual %>%
   group_by(SessionUID) %>%
   summarise(
@@ -295,12 +259,8 @@ frentes_df <- df_actual %>%
     sovi = ifelse(frentes_total == 0, 0, frentes_arca / frentes_total)
   )
 
-# Verificar el nuevo dataframe
-head(frentes_df)
-```
 
 ## Enfriadores
-```{r}
 result_enfriadores <- df_scenes %>%
   # Agrupar por SessionUID y SubSceneType y contar
   group_by(SessionUID, SubSceneType) %>%
@@ -323,12 +283,8 @@ if (!"Enfriador AC CEDIDO" %in% names(result_enfriadores)) {
 result_enfriadores <- result_enfriadores %>%
   mutate(enfriador_total = `Enfriador AC` + `Enfriador AC CEDIDO`)
 
-# Verificar el resultado
-head(result_enfriadores)
-```
 
 ## Flags
-```{r}
 # Creación del vector de valores de flag
 flag_values <- c(2, 4, 13, 14, 15, 16, 26, 27, 32, 36, 39, 31)
 #-------------------------------------------------------------
@@ -377,12 +333,7 @@ check_flags <- function(quality_string) {
 result_scenes$flag_trigger <- sapply(result_scenes$ImageQuality, check_flags)
 result_scenes$detected_flags <- sapply(result_scenes$ImageQuality, detect_flags)
 
-# Verificar el resultado
-head(result_scenes)
-```
-
 ## Cuotas
-```{r}
 master_clientes <- master_clientes %>%
   mutate(
     cuota_diaria = case_when(
@@ -399,13 +350,8 @@ master_clientes <- master_clientes %>%
     )
   )
 
-# Verificar el resultado
-head(master_clientes)
-```
-
 
 # Sabana Calidad Semilla 
-```{r}
 master_calidad <- df_survey %>%
   select(SessionUID = "Session Uid", SurveyType = "Survey Type", User, `Outlet Code`, duration, `Survey End Time`, estatus) %>%
   
@@ -440,15 +386,8 @@ master_calidad <- df_survey %>%
     modelo_de_servicio_ruta, salesterritorycode, territorio...14, `Survey End Time`, estatus
   )
 
-# Verificar el nuevo dataframe
-head(master_calidad)
-
-# Guardar archivo
-#write.xlsx(master_calidad, "master_calidad.xlsx")
-```
 
 ## Eliminar Directorio
-```{r}
 # Función para limpiar directorio de archivos individuales, manteniendo solo el combinado
 clean_directory <- function(path) {
   combined_file_path <- file.path(path, "combined.csv")
@@ -463,15 +402,11 @@ clean_directory <- function(path) {
 # Limpiar directorios de archivos individuales
 clean_directory("fuentes_datos/session/")
 clean_directory("fuentes_datos/survey/")
-```
 
 # Correción de Datos
 
 ## Flags Inducidas 
 
-### 0 Frentes Totales
-
-```{r}
 # 1. Contar los SceneUID distintos para cada SessionUID
 scene_count_df <- df_actual %>%
   group_by(SessionUID) %>%
@@ -501,12 +436,8 @@ master_calidad <- master_calidad_temp %>%
   ) %>%
   select(-min_frentes)  # Eliminamos la columna temporal min_frentes
 
-head(master_calidad)
-```
-
 
 ## Session End Time (as.Date and only first 10)
-```{r}
 master_calidad <- master_calidad %>%
   mutate(
     `Survey End Time` = as.Date(substr(`Survey End Time`, 1, 10), format = "%d/%m/%Y")
@@ -515,13 +446,8 @@ master_calidad <- master_calidad %>%
 # Corregir la columna 'detected_flags' para asegurar que haya comas entre cada dos caracteres
 master_calidad$detected_flags <- str_replace_all(master_calidad$detected_flags, "(\\d{2})(?!$)", "\\1,")
 
-# Verificar los primeros registros para asegurar que la corrección se aplicó correctamente
-head(master_calidad)
-```
-
-----------EVALUACIÓN-----------
+# ----------EVALUACIÓN-----------
 # Evaluación de Data
-```{r}
 # Paso 1: Unión con parametros_data
 master_evaluado <- master_calidad %>%
   left_join(parametros_data, by = c("tamaño" = "tamano", "tradechannelcode", "sub_canal_isscom"))
@@ -602,12 +528,7 @@ master_evaluado <- master_evaluado %>%
     )
   )
 
-# Verificar el resultado
-head(master_evaluado)
-```
-
 # Imputación de Territorio según coordenadas
-```{r}
 # Asegurándonos que SessionUID es del mismo tipo en ambos dataframes
 df_session$SessionUID <- as.character(df_session$SessionUId)
 master_evaluado$SessionUID <- as.character(master_evaluado$SessionUID)
@@ -616,11 +537,9 @@ master_evaluado$SessionUID <- as.character(master_evaluado$SessionUID)
 master_evaluado <- master_evaluado %>%
   left_join(df_session %>% select(SessionUID, latitude, longitude),
             by = "SessionUID")
-```
 
------------ GUARDAR DATA PROCESADA
 
-```{r message=FALSE, warning=FALSE}
+#----------- GUARDAR DATA PROCESADA -----------
 # Obtener el mes y año actual automáticamente
 mes_actual <- format(Sys.Date(), "%B_%Y")
 
@@ -659,13 +578,9 @@ write_csv(datos_actualizados, archivo_csv_mes)
 
 # Mensaje de confirmación
 cat("Los datos para", mes_actual, "han sido actualizados y guardados en", archivo_csv_mes, "\n")
-```
 
 
----------- LIMPIEZA DE DATA PROCESADA -------------
-```{r}
-library(tidyverse)
-library(readr)
+# ---------- LIMPIEZA DE DATA PROCESADA -------------
 
 # Definir la carpeta donde se encuentran los datos
 folder_path <- "data_procesada"
@@ -704,11 +619,9 @@ walk(files, process_file)
 
 # Mensaje de confirmación
 cat("Todos los archivos en la carpeta", folder_path, "han sido procesados y limpiados considerando valores NA y 0.\n")
-```
 
------------EXTRACTOS-----------
+# -----------EXTRACTOS-----------
 # Sabana de Calidad Madre
-```{r message=FALSE, warning=FALSE}
 # Ruta a la carpeta con los archivos procesados
 ruta_carpeta <- "data_procesada/"
 
@@ -758,107 +671,3 @@ write_csv(master_calidad, paste0(ruta_carpeta, "master_calidad.csv"))
 
 # Mensaje de confirmación
 cat("El archivo 'master_calidad.csv' ha sido guardado con éxito en la carpeta '", ruta_carpeta, "'.\n", sep="")
-```
-
-------- BUSQUEDA ----------
-
-### Actual
-```{r}
-result_dplyr <- df_actual %>%
-  filter(SessionUID == "d5d287fa-89cf-4e4c-88ef-97dfbb46bc1a")
-
-# Mostrando el resultado
-print(result_dplyr)
-```
-
-```{r}
-summary(master_evaluado)
-```
-
----------- DIVISION DE DATA POR MES -------------
-```{r message=FALSE, warning=FALSE}
-# Ruta al archivo Excel
-archivo_excel <- "ICD - Indice de Calidad de Data.xlsx"
-
-# Leer los datos de la pestaña "Data"
-df <- read_excel(archivo_excel, sheet = "Data")
-
-# Convertir la columna "Survey End Time" a tipo fecha
-df$Survey_End_Time <- as.Date(df$`Survey End Time`, format = "%m/%d/%Y")
-
-# Crear una columna con el mes y año
-df$Mes_Año <- format(df$Survey_End_Time, "%B_%Y")
-
-# Crear una carpeta para almacenar los datos procesados si no existe
-ruta_carpeta <- "data_procesada"
-if (!dir.exists(ruta_carpeta)) {
-  dir.create(ruta_carpeta, recursive = TRUE)
-  
-  # Verificar si la carpeta fue creada
-  if (!dir.exists(ruta_carpeta)) {
-    stop("La carpeta no pudo ser creada. Verifica los permisos.")
-  }
-}
-
-# Función para guardar los archivos CSV por mes
-guardar_csv_por_mes <- function(data, mes, ruta_carpeta) {
-  ruta_archivo <- file.path(ruta_carpeta, paste0(mes, ".csv"))
-  write.csv(data, ruta_archivo, row.names = FALSE)
-  cat("Archivo guardado:", ruta_archivo, "\n")
-}
-
-# Aplicar la función a cada mes
-lapply(unique(df$Mes_Año), function(mes) {
-  datos_mes <- filter(df, Mes_Año == mes)
-  if(nrow(datos_mes) > 0) {
-    guardar_csv_por_mes(datos_mes, mes, ruta_carpeta)
-  } else {
-    cat("No hay datos para el mes:", mes, "\n")
-  }
-})
-
-cat("Todos los archivos han sido creados.\n")
-```
-
--------- QUERIES PERSONALIZADOS --------
-```{r}
-# Asegúrate de que 'Survey End Time' es de tipo Date
-master_evaluado$`Survey End Time` <- as.Date(master_evaluado$`Survey End Time`, format = "%Y-%m-%d")
-
-# Crear una nueva columna con la fecha del lunes de la semana correspondiente
-master_evaluado <- master_evaluado %>%
-  mutate(
-    start_of_week = floor_date(`Survey End Time`, unit = "week"),
-    week_label = format(start_of_week, "%d %b"),
-    week_order = as.numeric(start_of_week)
-  )
-
-# Agrupar por 'salesterritorycode' y 'week_label', y contar 'SessionUID' únicos
-conteo_semanal <- master_evaluado %>%
-  group_by(salesterritorycode, week_label) %>%
-  summarise(total_count = n_distinct(SessionUID), .groups = 'drop') %>%
-  ungroup()
-
-# Ordenar el dataframe por 'salesterritorycode' y 'week_order'
-# Nota: Es importante usar 'week_order' solo para ordenar antes del pivot_wider y no incluirlo en el pivot_wider para evitar duplicados.
-conteo_semanal <- conteo_semanal %>%
-  arrange(salesterritorycode, week_order)
-
-# Pivotar los datos para tener las etiquetas de semanas como columnas y 'salesterritorycode' como filas
-tabla_conteo_semanal <- conteo_semanal %>%
-  pivot_wider(
-    names_from = week_label,
-    values_from = total_count,
-    values_fill = list(total_count = 0)
-  )
-
-# Ordenar las columnas por fecha usando 'week_order' de 'master_evaluado'
-column_order <- unique(master_evaluado$week_label[order(master_evaluado$week_order)])
-tabla_conteo_semanal <- tabla_conteo_semanal %>%
-  select(salesterritorycode, all_of(column_order))
-
-# Guardar el dataframe en un archivo Excel
-write.xlsx(tabla_conteo_semanal, "/mnt/data/tabla_conteo_semanal.xlsx")
-```
-
-

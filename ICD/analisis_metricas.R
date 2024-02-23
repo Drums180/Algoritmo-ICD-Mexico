@@ -1,12 +1,4 @@
----
-title: "Analisis Metricas"
-author: "David Dominguez - A01570975"
-date: "2023-10-17"
-output: html_document
----
-
-# Llamar Librerias
-```{r message=FALSE, warning=FALSE}
+## Llamar Librerias
 library(dplyr)
 library(readxl)
 library(openxlsx)
@@ -14,10 +6,8 @@ library(readr)
 library(purrr)
 library(tidyr)
 library(tidyverse)
-```
 
 ## Quality Data
-```{r message=FALSE, warning=FALSE}
 setwd("fuentes_datos/")  # Establecer ruta de trabajo
 
 # Función para leer y combinar archivos de una carpeta
@@ -85,10 +75,8 @@ combine_files <- function(path, file_type = c("csv", "excel")) {
 # Crear data frames para cada carpeta
 df_actual <- combine_files("actual/")
 df_scenes <- combine_files("scenes/")
-```
 
 ## Crear df sku
-```{r}
 # Asumiendo que df_actual ya está en el environment
 # Filtrado de df_actual
 df_actual_filtrado <- df_actual %>%
@@ -99,12 +87,7 @@ df_sku <- df_actual_filtrado %>%
   group_by(SessionUID, SceneUID, SKU) %>%
   summarise(Total = n(), .groups = 'drop')
 
-# Visualización de df_sku
-head(df_sku)
-```
-
 ## Importar Manual Questions
-```{r message=FALSE, warning=FALSE}
 # Lista todos los archivos en la carpeta fuentes_datos/sku_master
 archivos <- list.files(path = "fuentes_datos/manual_questions", full.names = TRUE)
 
@@ -166,12 +149,7 @@ leer_archivo <- function(archivo) {
 df_mq <- archivos %>%
   map_dfr(leer_archivo)
 
-# Visualización de df_fmprs
-head(df_mq)
-```
-
 ## Importar Master Productos
-```{r}
 # Lista todos los archivos en la carpeta fuentes_datos/sku_master
 archivos <- list.files(path = "fuentes_datos/sku_master", full.names = TRUE)
 
@@ -190,21 +168,11 @@ leer_archivo <- function(archivo) {
 df_fmprs <- archivos %>%
   map_dfr(leer_archivo)
 
-# Visualización de df_fmprs
-head(df_fmprs)
-```
-
 ## Importar de master_icd
-```{r}
 # Importación del archivo Excel
 master_icd <- read_excel("ICD - Indice de Calidad de Data.xlsx", sheet = "Export")
 
-# Visualización de master_icd
-head(master_icd)
-```
-
 ## Creación de df_metricas
-```{r message=FALSE, warning=FALSE}
 # Número de filas en df_sku
 n_rows <- nrow(df_sku)
 
@@ -258,12 +226,8 @@ df_metricas_part3 <- process_part(df_sku_part3)
 # Combinar las partes procesadas
 df_metricas <- bind_rows(df_metricas_part1, df_metricas_part2, df_metricas_part3)
 
-# Visualización del resultado final
-head(df_metricas)
-```
 
 # Manual Questions dataframe
-```{r}
 # Define las preguntas de interés
 preguntas_interes <- c(
   "¿El cliente es enrejado?",
@@ -289,11 +253,6 @@ df_reestructurado <- df_filtrado %>%
   pivot_wider(names_from = LocalQuestionText, 
               values_from = AnswerValue)  # Usar pivot_wider para reestructurar los datos
 
-# Visualizar el dataframe reestructurado
-head(df_reestructurado)
-```
-
-```{r}
 # Listar todos los archivos CSV en la carpeta 'metricas_procesada'
 archivos_csv <- list.files(path = "metricas_procesada", full.names = TRUE, pattern = "\\.csv$")
 
@@ -332,10 +291,8 @@ df_metricas_combinadas <- bind_rows(df_combinado, df_metricas)
 
 # Eliminar registros duplicados
 df_metricas_unicas <- df_metricas_combinadas %>% distinct()
-```
 
 ## Guardar Metricas Combinadas en archivos csv por mes
-```{r}
 # Primero, asegurarse de que el directorio existe o crearlo
 output_folder <- "metricas_procesada"
 if (!dir.exists(output_folder)) {
@@ -346,13 +303,11 @@ if (!dir.exists(output_folder)) {
 df_metricas_unicas %>%
   group_by(MesAno) %>%
   group_walk(~ write.csv(.x, file = paste0(output_folder, "/", .y$MesAno, ".csv"), row.names = FALSE))
-```
 
 
-
------------LIMPIEZA-----------
+# -----------LIMPIEZA-----------
 # Evitar duplicados dentro de data mensual
-```{r}
+
 # Definir la ruta de la carpeta donde se encuentran los archivos
 folder_path <- "metricas_procesada"
 
@@ -373,11 +328,10 @@ process_file <- function(file_path) {
 
 # Aplicar la función a cada archivo CSV en la carpeta
 lapply(archivos_csv, process_file)
-```
 
------------EXTRACTOS-----------
+
+# -----------EXTRACTOS-----------
 # Sabana de Metricas FMPR
-```{r}
 library(lubridate)
 library(openxlsx)
 library(dplyr)
@@ -411,16 +365,14 @@ guardar_por_mes <- function(df, date_column = "Survey_End_Time", path = "metrica
 
 # Uso de la función
 guardar_por_mes(df_metricas_unicas)
-```
+
 
 # Sabana de Manual Questions
-```{r}
 # Guardar archivo
 write.xlsx(df_reestructurado, "manual_questions.xlsx")
-```
 
------------ELIMINAR DATA ACTUAL-----------
-```{r}
+
+# -----------ELIMINAR DATA ACTUAL-----------
 # Función para limpiar directorio de archivos individuales, manteniendo solo el combinado
 clean_directory <- function(path) {
   combined_file_path <- file.path(path, "combined.csv")
@@ -435,157 +387,3 @@ clean_directory <- function(path) {
 # Limpiar directorios de archivos individuales
 clean_directory("fuentes_datos/actual/")
 clean_directory("fuentes_datos/scenes/")
-```
-
------------ UNIFICAR DATA DE METRICAS -----------
-```{r message=FALSE, warning=FALSE}
-# Cargar las bibliotecas necesarias
-library(readr)
-library(dplyr)
-
-# Especifica la ruta de la carpeta donde se encuentran los archivos
-ruta_carpeta <- "metricas_procesada/"
-nombres_archivos <- list.files(path = ruta_carpeta, pattern = "*.csv", full.names = TRUE)
-
-# Función para leer y transformar cada archivo CSV
-leer_y_transformar <- function(nombre_archivo) {
-  df <- read_csv(nombre_archivo)
-
-  # Convertir la columna 'Outlet_Code' a character si existe
-  if("Outlet_Code" %in% names(df)) {
-    df$Outlet_Code <- as.character(df$Outlet_Code)
-  }
-
-  return(df)
-}
-
-# Crear una lista con los dataframes importados y transformados
-lista_dataframes <- lapply(nombres_archivos, leer_y_transformar)
-
-# Combinar todos los dataframes en uno
-dataframe_combinado <- bind_rows(lista_dataframes)
-
-# Guardar el dataframe combinado en un nuevo archivo
-write_csv(dataframe_combinado, paste0(ruta_carpeta, "analitica_censo.csv"))
-```
-
-```{r message=FALSE, warning=FALSE}
-library(readr)
-library(dplyr)
-library(lubridate)
-
-# Cargar el dataframe agrupado
-ruta_carpeta <- "metricas_procesada/"
-nombre_archivo_agrupado <- paste0(ruta_carpeta, "analitica_censo_agrupado_reducido.csv")
-dataframe_agrupado <- read_csv(nombre_archivo_agrupado)
-
-# Asegurarse de que 'Survey_End_Time' esté en formato de fecha
-dataframe_agrupado$Survey_End_Time <- as.Date(dataframe_agrupado$Survey_End_Time)
-
-# Dividir el dataframe en dos periodos
-periodo1 <- dataframe_agrupado %>%
-  filter(Survey_End_Time >= as.Date("2023-09-01") & Survey_End_Time <= as.Date("2023-11-30"))
-
-periodo2 <- dataframe_agrupado %>%
-  filter(Survey_End_Time >= as.Date("2023-12-01") & Survey_End_Time <= as.Date("2024-02-28"))
-
-# Guardar los dataframes en archivos CSV
-write_csv(periodo1, paste0(ruta_carpeta, "analitica_censo_agrupado_sep_nov_2023.csv"))
-write_csv(periodo2, paste0(ruta_carpeta, "analitica_censo_agrupado_dic_feb_2023_2024.csv"))
-```
-
-
------------GUARDAR METRICAS PROCESADAS-----------
-```{r}
-# Combinar los DataFrames en uno solo
-df_metricas_combinadas <- bind_rows(metricas_09, metricas_10, metricas_11)
-
-# Procesar la columna de fecha y convertirla a tipo fecha
-df_metricas_combinadas$Survey_End_Time <- as.Date(df_metricas_combinadas$Survey_End_Time, format = "%m/%d/%Y")
-
-# Crear una nueva columna con el mes y el año
-df_metricas_combinadas$MesAno <- format(df_metricas_combinadas$Survey_End_Time, "%Y-%m")
-
-# Dividir el DataFrame combinado por la columna MesAno
-lista_meses <- split(df_metricas_combinadas, df_metricas_combinadas$MesAno)
-
-# Función para guardar cada división de mes en un archivo CSV
-guardar_csv_por_mes <- function(lista_meses, folder_path = "metricas_procesada/") {
-  # Asegurarse de que la carpeta existe o crearla
-  if (!dir.exists(folder_path)) {
-    dir.create(folder_path)
-  }
-  
-  # Iterar sobre cada mes y guardar un archivo CSV para cada uno
-  for (mes in names(lista_meses)) {
-    # Definir el nombre del archivo
-    nombre_archivo <- paste0(folder_path, mes, ".csv")
-    
-    # Guardar el DataFrame del mes en un archivo CSV
-    write.csv(lista_meses[[mes]], file = nombre_archivo, row.names = FALSE)
-  }
-}
-
-# Guardar los datos divididos por mes en archivos CSV
-guardar_csv_por_mes(lista_meses)
-```
-
-
-```{bash}
-df_fmprs
-Importar de fuentes_datos/sku_master y juntar todos los archivos xlsx XLSX o csv que hayan ahi para despues hacer un join usando
-SKU ID = SKU
-para traernos las columnas de 
-Is Foreign Product?
-Manufacturer
-Sub Brand
-Normalize Size 
-Package Type
-Product Group
-Local Product Category
-
-y ponerlas despues SKU en df_metricas
-
-Reporte final - Tradicional
----------
-Zona
-Subterritorio
-CEDI
-Ruta
-Outlet Code
-canal
-sub canal
-tamaño
-modelo de servicio
-User
-ICD
-SessionUID
-Fecha
------------
-scene + subscenettype + skuid + /F + M + P(Normalize Size + Empaque) + R + S*/ + Local Product Category + cantidad de frentes
-
-df_actual
-- por ahora asume que df_actual ya esta en el environment
-- se crea df_sku
-- contar cuantos hay de cada tipo en la columna SKU (agrupar)
-- pero tiene que estar dividido por SceneUID
-- y debe aparecer la columna SessionUID
-- De forma que se vea SessionUID | SceneUID | SKU | Total (Conteo por SKU)
-
-master_icd
-importar excel: ICD - Indice de Calidad de Data.xlsx hoja: Export encontrado en misma carpeta que archivo R
-- ICD
-- SessionUID
-
-df_metricas
-- join de df_sku con master_icd donde se pasen las columnas de: 
-- ICD segun el SessionUID
-- Outlet Code	segun el SessionUID
-- salesorganizationcode	segun el SessionUID
-- tamaño segun el SessionUID
-- tradechannelcode segun el SessionUID
-- (en df_metricas habra solamente un registro por SessionUID pero como nosotros tenemos repeticion en df_sku es necesario que se repitan todas las columnas por cada una de las entradas para que no hayan datos vacios)
-
-- una vez con todas las columnas vamos a filtrar unicamente los registros que tengan un ICD mayor o igual a 70
-```
-

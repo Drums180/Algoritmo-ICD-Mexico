@@ -1,12 +1,4 @@
----
-title: "Parametros ICD"
-author: "David Dominguez - A01570975"
-date: "2023-10-12"
-output: html_document
----
-
 # Librerias
-```{r}
 library(missForest)
 library(readxl)
 library(stringi)
@@ -14,10 +6,9 @@ library(openxlsx)
 library(dplyr)
 library(lmtest)
 library(ggplot2)
-```
+
 
 # Fuentes de Datos
-```{r}
 ruta <- "ICD - Indice de Calidad de Data.xlsx"
 df <- read_excel(ruta, sheet = "Export")
 
@@ -27,18 +18,14 @@ nombres <- tolower(nombres)
 nombres <- stringi::stri_trans_general(nombres, "Latin-ASCII")
 nombres <- gsub(" ", "_", nombres)
 colnames(df) <- nombres
-```
 
 # Data Aprobada
-```{r}
 df_aprobada <- df %>%
   filter(aprobacion == "Aprobado")
 
 head(df_aprobada)
-```
 
 # Creación de Parametros "Aprobados"
-```{r}
 # Función para filtrar outliers basados en IQR
 filter_outliers <- function(x) {
   Q1 <- quantile(x, 0.25, na.rm = TRUE)
@@ -71,11 +58,7 @@ parametros_df <- df_filtered %>%
     upper_bound_duration = quantile(duration, 0.975, na.rm = TRUE)
   )
 
-head(parametros_df)
-```
-
 # Creación de Parametros "Generales"
-```{r}
 # Filtrar outliers por grupo en el dataframe original
 df_filtered_general <- df %>%
   group_by(tradechannelcode, sub_canal_isscom, tamano) %>%
@@ -100,11 +83,8 @@ parametros_df_general <- df_filtered_general %>%
     upper_bound_duration = quantile(duration, 0.975, na.rm = TRUE)
   )
 
-head(parametros_df_general)
-```
-
 ## Creación Combinaciones Posibles
-```{r}
+
 # Todas las combinaciones posibles de sub_canal_isscom y tamano
 todos_tamanos <- c("MI", "CH", "M", "G", "XG")
 todos_sub_canal_isscom <- unique(parametros_df$sub_canal_isscom)
@@ -123,11 +103,8 @@ completado <- left_join(combinaciones_con_tradechannel, parametros_df, by = c("t
 # Reemplazar NAs con 0 (o cualquier otro valor que desees)
 completado[is.na(completado)] <- 0
 
-head(completado)
-```
 
 # Imputación de Vecinos Cercanos para los registros faltantes
-```{r}
 # Reemplazar 0 por NA en las columnas que deseas imputar
 cols_to_impute <- c("promedio_frentes_total", "lower_bound_frentes_total", "upper_bound_frentes_total", 
                    "promedio_enfriador_total", "lower_bound_enfriador_total", "upper_bound_enfriador_total", 
@@ -149,11 +126,8 @@ forest_imputed <- missForest(completado)
 # Sustituir valores imputados en el dataframe original
 completado_imputado <- forest_imputed$ximp
 
-head(completado_imputado)
-```
 
 # Parametros Finales
-```{r}
 # Hacer un left join de completado_imputado con parametros_df
 parametros_df_final <- left_join(completado_imputado, 
                                  parametros_df, 
@@ -183,10 +157,7 @@ parametros_df_final$upper_bound_frentes_total <- parametros_df_final$upper_bound
 parametros_df_final$upper_bound_enfriador_total <- parametros_df_final$upper_bound_enfriador_total * 3
 parametros_df_final$upper_bound_duration <- parametros_df_final$upper_bound_duration * 3
 
-head(parametros_df_final)
-```
 
-```{r}
 # 1. Calcular la cantidad de muestras para cada combinación
 n_muestras <- df_aprobada %>%
   group_by(tradechannelcode, sub_canal_isscom, tamano) %>%
@@ -215,9 +186,8 @@ promedio_ponderado_comer_beber <- filter(promedio_ponderado, tradechannelcode ==
 
 promedio_ponderado_tradicional
 promedio_ponderado_comer_beber
-```
 
-```{r}
+
 # Crear promedios por tradechannelcode y tamano
 promedios_por_tamano <- df_aprobada %>%
   group_by(tradechannelcode, tamano) %>%
@@ -240,12 +210,7 @@ general_por_tamano <- promedios_por_tamano %>%
 # Añadir las filas al dataframe parametros_df_final
 parametros_df_final <- rbind(parametros_df_final, general_por_tamano)
 
-# Verificar el resultado
-tail(parametros_df_final, 10)
-```
 
-
-```{r}
 # Ruta del archivo de destino
 ruta_destino <- "parametros.xlsx"
 
@@ -260,276 +225,4 @@ saveWorkbook(wb, ruta_destino, overwrite = TRUE)
 
 # Mensaje de confirmación
 cat("Datos exportados exitosamente a", ruta_destino)
-```
-
----- CREACION PARAMETROS INICIALES ----
-
-# Fuentes de Datos
-```{r warning=FALSE}
-ruta <- "ICD - Indice de Calidad de Data.xlsx"
-master_calidad <- read_excel(ruta, sheet = "Data")
-
-# Limpiar nombres de columnas
-nombres <- colnames(master_calidad)
-nombres <- tolower(nombres)
-nombres <- stringi::stri_trans_general(nombres, "Latin-ASCII")
-nombres <- gsub(" ", "_", nombres)
-colnames(master_calidad) <- nombres
-```
-
-```{r}
-ruta <- "ICD - Indice de Calidad de Data.xlsx"
-df <- read_excel(ruta, sheet = "Export")
-
-# Limpiar nombres de columnas
-nombres <- colnames(df)
-nombres <- tolower(nombres)
-nombres <- stringi::stri_trans_general(nombres, "Latin-ASCII")
-nombres <- gsub(" ", "_", nombres)
-colnames(df) <- nombres
-
-df_aprobada <- df %>%
-  filter(aprobacion == "Aprobado")
-```
-
-```{r}
-# Asegurarse de que todos los nombres de columnas sean únicos
-nombres <- colnames(master_calidad)
-nombres <- make.unique(tolower(nombres))
-nombres <- stringi::stri_trans_general(nombres, "Latin-ASCII")
-nombres <- gsub(" ", "_", nombres)
-colnames(master_calidad) <- nombres
-
-# Ahora puedes intentar filtrar nuevamente
-master_calidad <- master_calidad %>%
-  filter(sessionuid %in% df_aprobada$sessionuid)
-
-# Ver los primeros registros del dataframe filtrado
-head(master_calidad)
-
-```
-
-
-## Parametros de duration por tamaño
-```{r}
-# Calcular límites por tamaño usando IQR
-master_calidad %>%
-  group_by(tamano) %>%
-  summarise(
-    Q1 = quantile(duration, 0.25, na.rm = TRUE),
-    Q3 = quantile(duration, 0.75, na.rm = TRUE)
-  ) %>%
-  mutate(
-    IQR = Q3 - Q1,
-    lower_bound_duration = Q1,
-    upper_bound_duration = Q3 + (1.5 * IQR),
-  ) -> bounds_by_tamano
-
-# Mostrando los resultados
-print(bounds_by_tamano)
-```
-
-## Parametros de frentes por tamaño y subcanal
-```{r}
-library(readxl)
-library(dplyr)
-library(purrr)
-
-# Crear un nuevo dataframe a partir de master_calidad que incluye solo las sesiones filtradas
-master_calidad_filtered <- master_calidad 
-
-# Paso 3: Aplicar el análisis de IQR para frentes_toni en el nuevo dataframe filtrado
-master_calidad_filtered %>%
-  group_by(tamano, sub_canal_isscom, tradechannelcode) %>%
-  summarise(
-    Q1 = quantile(frentes_total, 0.125, na.rm = TRUE),
-    Q3 = quantile(frentes_total, 0.875, na.rm = TRUE),
-    .groups = 'drop'
-  ) %>%
-  mutate(
-    IQR = Q3 - Q1,
-    # Aplica la condición aquí
-    Q3_adjusted = ifelse(IQR == 0, Q3 * 4, Q3),
-    lower_bound_frentes = Q1,
-    upper_bound_frentes = ifelse(IQR == 0, Q3_adjusted + (8 + IQR + 50), Q3 + (8 * IQR + 50)) 
-  ) -> bounds_by_tamano_subcanal_frentes
-
-# Mostrando los resultados
-print(bounds_by_tamano_subcanal_frentes)
-```
-
-## Parametros de frentes arca
-```{r}
-library(readxl)
-library(dplyr)
-library(purrr)
-
-# Crear un nuevo dataframe a partir de master_calidad que incluye solo las sesiones filtradas
-master_calidad_filtered <- master_calidad 
-
-# Paso 3: Aplicar el análisis de IQR para frentes_toni en el nuevo dataframe filtrado
-master_calidad_filtered %>%
-  group_by(tamano, sub_canal_isscom, tradechannelcode) %>%
-  summarise(
-    Q1 = quantile(frentes_arca, 0.25, na.rm = TRUE),
-    Q2 = quantile(frentes_arca, 0.45, na.rm = TRUE),
-    Q3 = quantile(frentes_arca, 0.875, na.rm = TRUE),
-    .groups = 'drop'
-  ) %>%
-  mutate(
-    IQR = Q3 - Q1,
-    # Aplica la condición aquí
-    Q3_adjusted = ifelse(IQR == 0, Q3 * 4, Q3),
-    lower_bound_frentes_arca = Q2,
-    upper_bound_frentes_arca = ifelse(IQR == 0, Q3_adjusted + (8 + IQR + 50), Q3 + (8 * IQR + 50)) 
-  ) -> bounds_by_tamano_subcanal_frentes_arca
-
-# Mostrando los resultados
-print(bounds_by_tamano_subcanal_frentes_arca)
-```
-
-# Parametros de scenes
-```{r}
-
-```
-
-## Parametros de enfriadores por tamaño y subcanal
-```{r}
-library(readxl)
-library(dplyr)
-library(purrr)
-
-# Paso 1: Aplicar el análisis de IQR para frentes_toni en el nuevo dataframe filtrado
-master_calidad_filtered %>%
-  group_by(tamaño_homologado, subcanal_isscom, canal_isscom) %>%
-  summarise(
-    Q1 = quantile(enfriador_total, 0.35, na.rm = TRUE),
-    Q3 = quantile(enfriador_total, 0.85, na.rm = TRUE),
-    .groups = 'drop'
-  ) %>%
-  mutate(
-    IQR = Q3 - Q1,
-    # Aplica la condición aquí
-    Q3_adjusted = ifelse(IQR == 0, Q3 * 4, Q3),
-    lower_bound_enfriadores = Q1,
-    upper_bound_enfriadores = Q3 + 1
-  ) -> bounds_by_tamano_subcanal_enfriadores
-
-# Mostrando los resultados
-print(bounds_by_tamano_subcanal_enfriadores)
-```
-
-# Unificar parametros en un solo df
-```{r}
-# Unir los dataframes
-parametros_unificados <- bounds_by_tamano_subcanal_frentes %>%
-  full_join(bounds_by_tamano_subcanal_frentes_arca, by = "tamaño_homologado") %>%
-  full_join(bounds_by_tamano_subcanal_enfriadores, by = "tamaño_homologado") %>%
-  full_join(bounds_by_tamano_scenes, by = "tamaño_homologado") %>%
-  full_join(bounds_by_tamano, by = "tamaño_homologado") %>%
-  select(
-    canal_isscom = canal_isscom.x,
-    subcanal_isscom = subcanal_isscom.x,
-    tamaño_homologado,
-    lower_bound_duration,
-    upper_bound_duration,
-    lower_bound_frentes,
-    upper_bound_frentes,
-    lower_bound_enfriadores,
-    upper_bound_enfriadores,
-    lower_bound_NumScenes,
-    upper_bound_NumScenes,
-    lower_bound_ScenesAmb,
-    upper_bound_ScenesAmb,
-    lower_bound_ScenesFrio,
-    upper_bound_ScenesFrio,
-    lower_bound_frentes_arca,
-    upper_bound_frentes_arca
-  )
-
-# Mostrando los resultados
-print(parametros_unificados)
-```
-
-# Crear parametros generales 
-```{r}
-# Calcular promedios y cuantiles para 'duration', 'frentes_total', 'enfriadores_total' y 'Scenes'
-promedios_por_tamano <- master_calidad %>%
-  group_by(tamaño_homologado) %>%
-  summarise(
-    promedio_duration = mean(duration, na.rm = TRUE),
-    lower_bound_duration = quantile(duration, 0.35, na.rm = TRUE),
-    upper_bound_duration = quantile(duration, 0.8, na.rm = TRUE) * 3,
-    promedio_frentes_total = mean(frentes_total, na.rm = TRUE),
-    lower_bound_frentes_total = quantile(frentes_total, 0.5, na.rm = TRUE),
-    upper_bound_frentes_total = quantile(frentes_total, 0.8, na.rm = TRUE) * 7,
-    promedio_frentes_total_arca = mean(frentes_arca, na.rm = TRUE),
-    lower_bound_frentes_total_arca = quantile(frentes_arca, 0.5, na.rm = TRUE),
-    upper_bound_frentes_total_arca = quantile(frentes_arca, 0.8, na.rm = TRUE) * 7,
-    promedio_enfriadores_total = mean(enfriador_total, na.rm = TRUE),
-    lower_bound_enfriadores_total = quantile(enfriador_total, 0.35, na.rm = TRUE),
-    upper_bound_enfriadores_total = quantile(enfriador_total, 0.85, na.rm = TRUE),
-    lower_bound_NumScenes = quantile(Num.Scenes, 0.35, na.rm = TRUE),
-    upper_bound_NumScenes = quantile(Num.Scenes, 0.8, na.rm = TRUE) * 3,
-    lower_bound_ScenesAmb = quantile(Scenes_Amb, 0.35, na.rm = TRUE),
-    upper_bound_ScenesAmb = quantile(Scenes_Amb, 0.8, na.rm = TRUE) * 3,
-    lower_bound_ScenesFrio = quantile(Scenes_Frio, 0.35, na.rm = TRUE),
-    upper_bound_ScenesFrio = quantile(Scenes_Frio, 0.8, na.rm = TRUE) * 3,
-    .groups = 'drop'
-  )
-
-# Crear filas "Generales" con la data anterior
-general_por_tamano <- promedios_por_tamano %>%
-  mutate(canal_isscom = "VIV.LOCALES TRADICIONALES", subcanal_isscom = "General") %>%
-  rename(
-    lower_bound_duration = lower_bound_duration,
-    upper_bound_duration = upper_bound_duration,
-    lower_bound_frentes = lower_bound_frentes_total,
-    upper_bound_frentes = upper_bound_frentes_total,
-    lower_bound_frentes_arca = lower_bound_frentes_total_arca,
-    upper_bound_frentes_arca = upper_bound_frentes_total_arca,
-    lower_bound_enfriadores = lower_bound_enfriadores_total,
-    upper_bound_enfriadores = upper_bound_enfriadores_total,
-    lower_bound_NumScenes = lower_bound_NumScenes,
-    upper_bound_NumScenes = upper_bound_NumScenes,
-    lower_bound_ScenesAmb = lower_bound_ScenesAmb,
-    upper_bound_ScenesAmb = upper_bound_ScenesAmb,
-    lower_bound_ScenesFrio = lower_bound_ScenesFrio,
-    upper_bound_ScenesFrio = upper_bound_ScenesFrio
-  )
-
-# Eliminar filas con 'tamano' = NA
-parametros_unificados <- parametros_unificados %>%
-  filter(!is.na(tamaño_homologado) & tamaño_homologado != "NA") 
-
-# Asegurarse de que 'general_por_tamano' tenga las mismas columnas que 'parametros_unificados', en el mismo orden
-general_por_tamano <- general_por_tamano %>%
-  select(names(parametros_unificados))
-
-# Añadir las filas de 'general_por_tamano' al final de 'parametros_unificados'
-parametros_unificados <- bind_rows(parametros_unificados, general_por_tamano)
-
-# Mostrando los resultados
-print(parametros_unificados)
-```
-
-
-# Exportar parametros
-```{r}
-# Ruta del archivo de destino
-ruta_destino <- "parametros.xlsx"
-
-# Crear un nuevo archivo de Excel con los datos
-wb <- createWorkbook()
-
-# Añadir una hoja de cálculo y escribir los datos en ella
-addWorksheet(wb, "data")
-writeData(wb, sheet = "data", x = parametros_unificados, startRow = 1, startCol = 1, colNames = TRUE)
-
-# Guardar el archivo de Excel
-saveWorkbook(wb, ruta_destino, overwrite = TRUE)
-
-# Mensaje de confirmación
-cat("Datos exportados exitosamente a", ruta_destino)
-```
 

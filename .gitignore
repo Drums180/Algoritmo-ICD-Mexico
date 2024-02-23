@@ -1,5 +1,6 @@
 # Ignorar archivos relacionados a la carga backlog de R
 ICD/fuentes_datos/.RData
+ICD/fuentes_datos/.Rhistory
 
 # Ignorar archivos relacionados a la carga backlog de DS
 .DS_Store
