@@ -16,7 +16,7 @@ ICD/fuentes_datos/bases_extra/YDRAY-Master-Clientes-TRAD-CB---Agosto-2023.csv
 
 # Ignorar archivos de data procesada
 ICD/master_calidad.csv
-data_procesada/*
+ICD/data_procesada/*
 ICD/ICD - Indice de Calidad de Data_v2.xlsx
 ICD/manual_questions.xlsx
 ICD/master_metricas.xlsx
