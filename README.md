@@ -61,7 +61,7 @@ Sin embargo, su alcance va más allá de la organización:
 
 En resumen, aunque el algoritmo esté diseñado con un propósito específico dentro de Arca Continental, su estructura y metodología ofrecen un valor considerable para cualquier persona o entidad interesada en la validación y mejora de la calidad de los datos.
 
-## Información Extraofficial para Uso y Aportación
+## Información Extraoficial para Uso y Aportación
 
 ### Instalación
 
