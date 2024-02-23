@@ -1,0 +1,864 @@
+---
+title: "Indice de Calidad"
+author: "David Dominguez - A01570975"
+date: "2023-09-14"
+output: html_document
+---
+
+# Llamar Librerias
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(readr)
+library(readxl)
+library(tidyverse)
+library(fs) # para funciones de sistema de archivos
+library(purrr)
+library(openxlsx)
+library(sf)
+library(httr)
+library(jsonlite)
+library(ggplot2)
+```
+
+# Carga de Base de Datos
+
+## Quality Data
+```{r message=FALSE, warning=FALSE}
+setwd("fuentes_datos/")  # Establecer ruta de trabajo
+
+# Función para leer y combinar archivos de una carpeta
+combine_files <- function(path, file_type = c("csv", "excel")) {
+  
+  # Obtener lista de archivos en el directorio especificado
+  files <- list.files(path, full.names = TRUE)
+  
+  df_combined <- data.frame()
+  
+  process_file <- function(file) {
+  tryCatch({
+    if (grepl("\\.csv$", file)) {
+      data <- read_csv(file)
+    } else if (grepl("\\.(xlsx|xls|XLSX|XLS)$", file)) {
+      data <- read_excel(file)
+    } else {
+      stop("Tipo de archivo no soportado")
+    }
+    
+    # Lista de columnas que deben ser double
+    cols_to_double <- c("Duration(Sec)", "longitude", "latitude", "SessionEndLongitude", "SessionEndLatitude")
+    
+    # Convertir todas las columnas a character, excepto las especificadas
+    data[] <- lapply(names(data), function(col) {
+      if (col %in% cols_to_double) {
+        as.numeric(as.character(data[[col]]))
+      } else {
+        as.character(data[[col]])
+      }
+    })
+    
+    return(data)
+  }, error = function(e) {
+    print(paste("Error al procesar el archivo:", file))  # Imprimir el archivo con error
+    print(e)  # Imprimir el error específico
+    return(NULL)
+  })
+}
+
+  if ("csv" %in% file_type) {
+    files_csv <- grep("\\.csv$", files, value = TRUE)
+    if(length(files_csv) > 0){
+      df_list_csv <- lapply(files_csv, process_file)
+      df_combined <- bind_rows(df_combined, do.call(bind_rows, df_list_csv))
+    }
+  }
+  
+  if ("excel" %in% file_type) {
+    files_xls <- grep("\\.(xlsx|xls|XLSX|XLS)$", files, value = TRUE)
+    if(length(files_xls) > 0){
+      df_list_xls <- lapply(files_xls, process_file)
+      df_combined <- bind_rows(df_combined, do.call(bind_rows, df_list_xls))
+    }
+  }
+  
+  # Eliminar filas duplicadas
+  if(nrow(df_combined) > 0) {
+    df_combined <- df_combined %>% distinct()
+  }
+  
+  return(df_combined)
+}
+
+# Crear data frames para cada carpeta
+df_actual <- combine_files("actual/")
+df_session <- combine_files("session/")
+df_survey <- combine_files("survey/")
+df_scenes <- combine_files("scenes/")
+```
+
+## Query Como Dato
+```{r}
+# Lista de todos los archivos Excel y CSV en el directorio
+files <- dir("fuentes_datos/comodato", pattern = "\\.xlsx$|\\.csv$", full.names = TRUE)
+
+# Lee cada archivo y combínalos en un solo dataframe
+df_comodato <- map_dfr(files, ~ {
+  if (grepl("\\.xlsx$", .x)) {
+    read_xlsx(.x)
+  } else if (grepl("\\.csv$", .x)) {
+    read_csv(.x)
+  }
+})
+
+# Agrupa por Código Cliente y suma # de Artículos
+df_poc <- df_comodato %>%
+  group_by(`Código Cliente`) %>%
+  summarise(Total_Articulos = sum(`# de Articulos`, na.rm = TRUE)) %>%
+  ungroup()
+
+# Verifica el resultado
+head(df_poc)
+```
+
+## Master Clientes
+```{r message=FALSE, warning=FALSE}
+# Función para leer un archivo y limpiar nombres de columnas, aceptando tanto .xlsx como .csv
+read_and_clean <- function(file_path) {
+  if (grepl("\\.xlsx$", file_path)) {
+    df <- read_xlsx(file_path)
+  } else if (grepl("\\.csv$", file_path)) {
+    df <- read_csv(file_path)
+  }
+  df <- limpiar_nombres(df)
+  return(df)
+}
+
+# Rutas de archivos específicos, ajusta las rutas según sea necesario
+ruta_clientes_trad <- "fuentes_datos/clientes/Catálogo Clientes MX TRAD + C&B"
+ruta_omd_censo <- "fuentes_datos/clientes/OMD Censo México NOV23"
+
+# Extensión de archivos, verifica si existe como .xlsx o .csv y ajusta la ruta
+ext_clientes_trad <- if (file.exists(paste0(ruta_clientes_trad, ".xlsx"))) { ".xlsx" } else { ".csv" }
+ext_omd_censo <- if (file.exists(paste0(ruta_omd_censo, ".xlsx"))) { ".xlsx" } else { ".csv" }
+
+# Leer y limpiar los archivos específicos
+clientes_trad <- read_and_clean(paste0(ruta_clientes_trad, ext_clientes_trad))
+omd_censo <- read_and_clean(paste0(ruta_omd_censo, ext_omd_censo))
+all_dfs <- read_all_files("fuentes_datos/clientes")
+
+# Convertir PostalCode a character si existe en ambos dataframes
+if("postalcode" %in% names(clientes_trad) && "postalcode" %in% names(omd_censo)) {
+  clientes_trad$postalcode <- as.character(clientes_trad$postalcode)
+  omd_censo$postalcode <- as.character(omd_censo$postalcode)
+}
+
+# Continuar con el proceso de combinación, eliminación de duplicados, y manipulación de columnas como se hacía previamente
+clientes_combinados <- bind_rows(clientes_trad, omd_censo)
+
+clientes_unicos <- clientes_combinados %>% 
+  arrange(desc(customercode)) %>% 
+  distinct(customercode, .keep_all = TRUE)
+
+# Suponiendo que "Clientes" es el nombre correcto después de la estandarización de nombres, ajusta según sea necesario
+mds <- all_dfs[["Clientes"]]  # Asumiendo que ahora todos los nombres están en minúsculas
+
+mds <- mds %>%
+  group_by(codigo_cliente) %>%
+  filter(row_number() == 1) %>%
+  ungroup() %>%
+  mutate(
+    tamaño = case_when(
+      canal_rgm == "comer y beber" ~ "MI",
+      TRUE ~ tolower(tamaño_de_cliente)
+    ),
+    tamaño = case_when(
+      tamaño == "micro" ~ "MI",
+      tamaño == "pequeño" ~ "CH",
+      tamaño == "mediano" ~ "M",
+      tamaño == "grande" ~ "G",
+      tamaño == "extra grande" ~ "XG",
+      TRUE ~ tamaño
+    )
+  )
+
+master_clientes <- clientes_unicos %>%
+  left_join(mds[, c("codigo_cliente", "tamaño", "sub_canal_isscom", "modelo_de_servicio_ruta", "ruta_preventa_oficial", "zona...13", "territorio...14")], 
+            by = c("customercode" = "codigo_cliente"))
+
+# Verificar el resultado
+head(master_clientes)
+```
+
+## Parametros
+```{r}
+# Función para leer un archivo (Excel o CSV) y opcionalmente una hoja específica para Excel
+read_file_with_sheet <- function(file_path, sheet_name = NULL) {
+  if (file.exists(paste0(file_path, ".xlsx"))) {
+    # Si el archivo es Excel, usa read_xlsx con la hoja especificada
+    df <- read_xlsx(paste0(file_path, ".xlsx"), sheet = sheet_name)
+  } else if (file.exists(paste0(file_path, ".csv"))) {
+    # Si el archivo es CSV, asume que es equivalente a la hoja "data" y usa read_csv
+    df <- read_csv(paste0(file_path, ".csv"))
+  } else {
+    stop("Archivo no encontrado.")
+  }
+  return(df)
+}
+
+# Ruta del archivo sin la extensión
+ruta_parametros <- "parametros"
+
+# Cargar la hoja "data" del archivo "parametros", buscando tanto .xlsx como .csv
+parametros_data <- read_file_with_sheet(ruta_parametros, "data")
+
+# Verificar la carga de datos
+head(parametros_data)
+```
+
+# Sabana de Analisis
+
+## Tiempo
+```{r}
+df_survey <- df_survey %>%
+  mutate(duration = `Duration(Sec)` / 60) %>%
+  mutate(estatus = if_else(Status == "Complete", 1, 0))
+
+# Verificar los cambios
+head(df_survey)
+```
+
+## Coordenadas - ()
+```{r}
+# Función del haversine para calcular distancia entre dos puntos de latitud y longitud
+haversine <- function(lon1, lat1, lon2, lat2) {
+  R <- 6371000  # Radio de la Tierra en metros
+  phi1 <- lat1 * (pi / 180)
+  phi2 <- lat2 * (pi / 180)
+  delta_phi <- (lat2 - lat1) * (pi / 180)
+  delta_lambda <- (lon2 - lon1) * (pi / 180)
+  
+  a <- sin(delta_phi / 2)^2 + cos(phi1) * cos(phi2) * sin(delta_lambda / 2)^2
+  c <- 2 * atan2(sqrt(a), sqrt(1 - a))
+  
+  d <- R * c  # Distancia en metros
+  return(d)
+}
+
+# Convertir las columnas relevantes a character
+df_session$OutletCode <- as.character(df_session$OutletCode)
+master_clientes$customercode <- as.character(master_clientes$customercode)
+
+# Realizar el join y calcular la distancia usando la función haversine
+df_session <- df_session %>%
+  left_join(select(master_clientes, customercode, latitude, longitude),
+            by = c("OutletCode" = "customercode")) %>%
+  mutate(
+    distance = mapply(haversine, longitude, latitude, SessionEndLongitude, SessionEndLatitude)
+  )
+
+# Calculamos los cuartiles y el rango intercuartil de la distancia
+Q1 <- quantile(df_session$distance, 0.25, na.rm = TRUE)
+Q3 <- quantile(df_session$distance, 0.75, na.rm = TRUE)
+IQR <- Q3 - Q1
+
+# Reemplazar valores atípicos por 0
+df_session$distance[df_session$distance < (Q1 - 1.5 * IQR) | 
+                    df_session$distance > (Q3 + 1.5 * IQR)] <- 0
+
+# Identificar valores atípicos
+outliers <- df_session$distance[df_session$distance < (Q1 - 1.5 * IQR) | 
+                                df_session$distance > (Q3 + 1.5 * IQR)]
+
+# Imprimir valores atípicos
+print(outliers)
+
+
+# Verificar los cambios
+head(df_session)
+```
+
+## Frentes - (CHECK)
+```{r}
+frentes_df <- df_actual %>%
+  group_by(SessionUID) %>%
+  summarise(
+    # Cálculo de num_frentes
+    num_frentes = sum(ProductName != "Foreign" & IsEmpty == FALSE),
+    # Cálculo de frentes_com
+    frentes_com = sum(ProductName != "Foreign" & IsForeign == TRUE),
+    # Cálculo de frentes_total
+    frentes_total = sum(ProductName != "Foreign" & IsEmpty == FALSE)
+  ) %>%
+  mutate(
+    # Cálculo de frentes_arca
+    frentes_arca = frentes_total - frentes_com,
+    # Cálculo de sovi
+    sovi = ifelse(frentes_total == 0, 0, frentes_arca / frentes_total)
+  )
+
+# Verificar el nuevo dataframe
+head(frentes_df)
+```
+
+## Enfriadores
+```{r}
+result_enfriadores <- df_scenes %>%
+  # Agrupar por SessionUID y SubSceneType y contar
+  group_by(SessionUID, SubSceneType) %>%
+  count() %>%
+  # Transforma valores de SubSceneType en columnas individuales
+  spread(key = SubSceneType, value = n, fill = 0) %>% # fill = 0 para llenar con 0s donde no haya conteos
+  ungroup()
+
+# Funcion para sumar Enfriadores 
+
+# Genera las columnas si no existen
+if (!"Enfriador AC" %in% names(result_enfriadores)) {
+  result_enfriadores$`Enfriador AC` <- 0
+}
+if (!"Enfriador AC CEDIDO" %in% names(result_enfriadores)) {
+  result_enfriadores$`Enfriador AC CEDIDO` <- 0
+}
+
+# Suma las columnas
+result_enfriadores <- result_enfriadores %>%
+  mutate(enfriador_total = `Enfriador AC` + `Enfriador AC CEDIDO`)
+
+# Verificar el resultado
+head(result_enfriadores)
+```
+
+## Flags
+```{r}
+# Creación del vector de valores de flag
+flag_values <- c(2, 4, 13, 14, 15, 16, 26, 27, 32, 36, 39, 31)
+#-------------------------------------------------------------
+
+# Función para dividir la cadena en pares y añadir comas
+format_image_quality <- function(value) {
+  # Divide la cadena en pares de caracteres
+  split_values <- str_extract_all(value, ".{1,2}")[[1]]
+  # Une los valores con comas
+  paste(split_values, collapse = ",")
+}
+
+# Aplica la función a la columna ImageQuality
+df_scenes$ImageQuality <- sapply(df_scenes$ImageQuality, format_image_quality)
+
+# Ahora procede con la agrupación y concatenación
+result_scenes <- df_scenes %>%
+  group_by(SessionUID) %>%
+  summarise(ImageQuality = paste(unique(ImageQuality), collapse = ",")) %>%
+  ungroup()
+
+#--------------------------------------------------------------
+# Función para detectar las flags en la columna ImageQuality
+detect_flags <- function(quality_string) {
+  quality_values <- as.numeric(unlist(strsplit(quality_string, ",")))  # Divide la cadena y convierte a numéricos
+  detected <- quality_values[quality_values %in% flag_values]
+  if(length(detected) > 0) {
+    return(paste(detected, collapse = ","))
+  } else {
+    return(NA_character_)
+  }
+}
+
+# Función para comprobar si alguno de los valores de flag está en la columna ImageQuality
+check_flags <- function(quality_string) {
+  quality_values <- as.numeric(unlist(strsplit(quality_string, ",")))  # Divide la cadena y convierte a numéricos
+  
+  if(any(quality_values %in% flag_values)) {
+    return(-100)
+  } else {
+    return(100)
+  }
+}
+
+# Aplicar ambas funciones a la columna ImageQuality de result_scenes
+result_scenes$flag_trigger <- sapply(result_scenes$ImageQuality, check_flags)
+result_scenes$detected_flags <- sapply(result_scenes$ImageQuality, detect_flags)
+
+# Verificar el resultado
+head(result_scenes)
+```
+
+## Cuotas
+```{r}
+master_clientes <- master_clientes %>%
+  mutate(
+    cuota_diaria = case_when(
+      modelo_de_servicio_ruta == "PRE ESPECIALIZADA" ~ 3,
+      modelo_de_servicio_ruta == "PREVENTA 24" ~ 2,
+      modelo_de_servicio_ruta == "PREVENTA 48 FORANEO" ~ 1,
+      modelo_de_servicio_ruta == "PRE MDO TRADICIONA" ~ 2,
+      modelo_de_servicio_ruta == "PRE MICRO MERCADOS" ~ 3,
+      modelo_de_servicio_ruta == "PREVENTA 72 FOR" ~ 1,
+      modelo_de_servicio_ruta == "PREVENTA 48 METROPOLITANO" ~ 1,
+      modelo_de_servicio_ruta == "PRE COMERCIAL" ~ 2,
+      modelo_de_servicio_ruta == "PREVENTA NCBS" ~ 3,
+      TRUE ~ NA_real_
+    )
+  )
+
+# Verificar el resultado
+head(master_clientes)
+```
+
+
+# Sabana Calidad Semilla 
+```{r}
+master_calidad <- df_survey %>%
+  select(SessionUID = "Session Uid", SurveyType = "Survey Type", User, `Outlet Code`, duration, `Survey End Time`, estatus) %>%
+  
+  # Unión con master_clientes
+  left_join(master_clientes %>% 
+              mutate(customercode = as.character(customercode)) %>%
+              select(customercode, tamaño, salesorganizationcode, tradechannelcode, sub_canal_isscom, modelo_de_servicio_ruta, salesterritorycode, territorio...14),
+            by = c("Outlet Code" = "customercode")) %>%
+  
+  # Incorporar columnas de df_session
+  left_join(df_session %>% select(SessionUId, distance),
+            by = c("SessionUID" = "SessionUId")) %>%  
+  
+  # Incorporar métricas de frentes_df
+  left_join(frentes_df %>% select(SessionUID, frentes_total, frentes_arca, sovi),
+            by = "SessionUID") %>%
+
+  # Incorporar columna flag_trigger de result_scenes
+  left_join(result_scenes %>% select(SessionUID, flag_trigger, detected_flags),
+            by = "SessionUID") %>%
+
+  # Incorporar columna enfriador_total de result_enfriadores
+  left_join(result_enfriadores %>% select(SessionUID, enfriador_total),
+            by = "SessionUID") %>%
+  
+  # Seleccionar y reordenar columnas
+  select(
+    SessionUID, SurveyType, User, `Outlet Code`, 
+    salesorganizationcode, tamaño, tradechannelcode, sub_canal_isscom,
+    duration, distance,
+    frentes_total, frentes_arca, sovi, flag_trigger, enfriador_total, detected_flags,
+    modelo_de_servicio_ruta, salesterritorycode, territorio...14, `Survey End Time`, estatus
+  )
+
+# Verificar el nuevo dataframe
+head(master_calidad)
+
+# Guardar archivo
+#write.xlsx(master_calidad, "master_calidad.xlsx")
+```
+
+## Eliminar Directorio
+```{r}
+# Función para limpiar directorio de archivos individuales, manteniendo solo el combinado
+clean_directory <- function(path) {
+  combined_file_path <- file.path(path, "combined.csv")
+  
+  # Listar todos los archivos excepto el archivo combinado
+  files_to_delete <- setdiff(list.files(path, full.names = TRUE), combined_file_path)
+  
+  # Eliminar archivos
+  file.remove(files_to_delete)
+}
+
+# Limpiar directorios de archivos individuales
+clean_directory("fuentes_datos/session/")
+clean_directory("fuentes_datos/survey/")
+```
+
+# Correción de Datos
+
+## Flags Inducidas 
+
+### 0 Frentes Totales
+
+```{r}
+# 1. Contar los SceneUID distintos para cada SessionUID
+scene_count_df <- df_actual %>%
+  group_by(SessionUID) %>%
+  summarise(min_frentes = n_distinct(SceneUID) * 3) 
+
+# Unir temporalmente con master_calidad para aplicar las condiciones
+master_calidad_temp <- left_join(master_calidad, scene_count_df, by = "SessionUID")
+
+# Actualizar las flags de acuerdo con las condiciones
+master_calidad <- master_calidad_temp %>%
+  mutate(
+    # Flag para 0 frentes totales
+    detected_flags = ifelse(frentes_total == 0, 
+                            ifelse(is.na(detected_flags), "66", paste(detected_flags, ",66", sep="")),
+                            detected_flags),
+    flag_trigger = ifelse(frentes_total == 0, -100, flag_trigger),
+    # Flag para frentes insuficientes
+    detected_flags = ifelse(frentes_total < min_frentes, 
+                            ifelse(is.na(detected_flags), "61", paste(detected_flags, ",61", sep="")),
+                            detected_flags),
+    flag_trigger = ifelse(frentes_total < min_frentes, -100, flag_trigger),
+    # Nueva flag para enfriador_total no nulo y frentes_total nulo
+    detected_flags = ifelse(!is.na(enfriador_total) & is.na(frentes_total),
+                            ifelse(is.na(detected_flags), "-100", paste(detected_flags, ",-100", sep="")),
+                            detected_flags),
+    flag_trigger = ifelse(!is.na(enfriador_total) & is.na(frentes_total), -100, flag_trigger)
+  ) %>%
+  select(-min_frentes)  # Eliminamos la columna temporal min_frentes
+
+head(master_calidad)
+```
+
+
+## Session End Time (as.Date and only first 10)
+```{r}
+master_calidad <- master_calidad %>%
+  mutate(
+    `Survey End Time` = as.Date(substr(`Survey End Time`, 1, 10), format = "%d/%m/%Y")
+  )
+
+# Corregir la columna 'detected_flags' para asegurar que haya comas entre cada dos caracteres
+master_calidad$detected_flags <- str_replace_all(master_calidad$detected_flags, "(\\d{2})(?!$)", "\\1,")
+
+# Verificar los primeros registros para asegurar que la corrección se aplicó correctamente
+head(master_calidad)
+```
+
+----------EVALUACIÓN-----------
+# Evaluación de Data
+```{r}
+# Paso 1: Unión con parametros_data
+master_evaluado <- master_calidad %>%
+  left_join(parametros_data, by = c("tamaño" = "tamano", "tradechannelcode", "sub_canal_isscom"))
+
+# Paso 2: Generar subconjuntos basados en combinaciones de tradechannelcode, tamaño y sub_canal_isscom "General"
+comer_beber_MI <- parametros_data[parametros_data$tradechannelcode == "Comer y Beber" & parametros_data$tamano == "MI" & parametros_data$sub_canal_isscom == "General", ]
+comer_beber_CH <- parametros_data[parametros_data$tradechannelcode == "Comer y Beber" & parametros_data$tamano == "CH" & parametros_data$sub_canal_isscom == "General", ]
+comer_beber_M  <- parametros_data[parametros_data$tradechannelcode == "Comer y Beber" & parametros_data$tamano == "M"  & parametros_data$sub_canal_isscom == "General", ]
+comer_beber_G  <- parametros_data[parametros_data$tradechannelcode == "Comer y Beber" & parametros_data$tamano == "G"  & parametros_data$sub_canal_isscom == "General", ]
+comer_beber_XG <- parametros_data[parametros_data$tradechannelcode == "Comer y Beber" & parametros_data$tamano == "XG" & parametros_data$sub_canal_isscom == "General", ]
+
+tradicional_MI <- parametros_data[parametros_data$tradechannelcode == "Tradicional" & parametros_data$tamano == "MI" & parametros_data$sub_canal_isscom == "General", ]
+tradicional_CH <- parametros_data[parametros_data$tradechannelcode == "Tradicional" & parametros_data$tamano == "CH" & parametros_data$sub_canal_isscom == "General", ]
+tradicional_M  <- parametros_data[parametros_data$tradechannelcode == "Tradicional" & parametros_data$tamano == "M"  & parametros_data$sub_canal_isscom == "General", ]
+tradicional_G  <- parametros_data[parametros_data$tradechannelcode == "Tradicional" & parametros_data$tamano == "G"  & parametros_data$sub_canal_isscom == "General", ]
+tradicional_XG <- parametros_data[parametros_data$tradechannelcode == "Tradicional" & parametros_data$tamano == "XG" & parametros_data$sub_canal_isscom == "General", ]
+
+# Corrección del Paso 2 y 3: Usar bucle para iterar sobre columnas y reemplazar NAs
+cols_to_modify <- c("promedio_frentes_total", "lower_bound_frentes_total", "upper_bound_frentes_total", 
+                    "promedio_enfriador_total", "lower_bound_enfriador_total", "upper_bound_enfriador_total", 
+                    "promedio_duration", "lower_bound_duration", "upper_bound_duration","aprobacion")
+
+for(col in cols_to_modify) {
+  
+  # Comer y Beber
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & master_evaluado$tradechannelcode == "Comer y Beber" & master_evaluado$tamaño == "MI", comer_beber_MI[[col]], master_evaluado[[col]])
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & master_evaluado$tradechannelcode == "Comer y Beber" & master_evaluado$tamaño == "CH", comer_beber_CH[[col]], master_evaluado[[col]])
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & master_evaluado$tradechannelcode == "Comer y Beber" & master_evaluado$tamaño == "M",  comer_beber_M[[col]],  master_evaluado[[col]])
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & master_evaluado$tradechannelcode == "Comer y Beber" & master_evaluado$tamaño == "G",  comer_beber_G[[col]],  master_evaluado[[col]])
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & master_evaluado$tradechannelcode == "Comer y Beber" & master_evaluado$tamaño == "XG", comer_beber_XG[[col]], master_evaluado[[col]])
+
+    # Tradicional
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & master_evaluado$tradechannelcode == "Tradicional" & master_evaluado$tamaño == "MI", tradicional_MI[[col]], master_evaluado[[col]])
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & master_evaluado$tradechannelcode == "Tradicional" & master_evaluado$tamaño == "CH", tradicional_CH[[col]], master_evaluado[[col]])
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & master_evaluado$tradechannelcode == "Tradicional" & master_evaluado$tamaño == "M",  tradicional_M[[col]],  master_evaluado[[col]])
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & master_evaluado$tradechannelcode == "Tradicional" & master_evaluado$tamaño == "G",  tradicional_G[[col]],  master_evaluado[[col]])
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & master_evaluado$tradechannelcode == "Tradicional" & master_evaluado$tamaño == "XG", tradicional_XG[[col]], master_evaluado[[col]])
+  
+  # Para los NA en tradechannelcode
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & is.na(master_evaluado$tradechannelcode) & master_evaluado$tamaño == "M", tradicional_M[[col]], master_evaluado[[col]])
+  
+  # Caso donde tamaño es NA pero tradechannelcode es "Comer y Beber"
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & is.na(master_evaluado$tamaño) & master_evaluado$tradechannelcode == "Comer y Beber", comer_beber_M[[col]], master_evaluado[[col]])
+
+  # Caso donde tamaño es NA pero tradechannelcode es "Tradicional"
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]) & is.na(master_evaluado$tamaño) & master_evaluado$tradechannelcode == "Tradicional", tradicional_M[[col]], master_evaluado[[col]])
+}
+
+# Paso 4
+# Imputación final para reemplazar cualquier NA restante con los valores de 'tradicional_M'
+for(col in cols_to_modify) {
+  master_evaluado[[col]] <- ifelse(is.na(master_evaluado[[col]]), tradicional_M[[col]], master_evaluado[[col]])
+}
+
+# Paso 5: Calificación
+master_evaluado <- master_evaluado %>%
+  mutate(
+    # Calificación para frentes_total
+    score_frentes_total = case_when(
+      frentes_total >= lower_bound_frentes_total & frentes_total <= upper_bound_frentes_total ~ 100,
+      frentes_total >= (lower_bound_frentes_total - 0.1 * (upper_bound_frentes_total - lower_bound_frentes_total)) &
+        frentes_total <= (upper_bound_frentes_total + 0.1 * (upper_bound_frentes_total - lower_bound_frentes_total)) ~ 50,
+      TRUE ~ 0
+    ),
+    # Calificación para duration
+    score_duration = case_when(
+      duration >= lower_bound_duration & duration <= upper_bound_duration ~ 100,
+      duration >= (lower_bound_duration - 0.1 * (upper_bound_duration - lower_bound_duration)) &
+        duration <= (upper_bound_duration + 0.1 * (upper_bound_duration - lower_bound_duration)) ~ 50,
+      TRUE ~ 0
+    ),
+    # Calificación para enfriador_total
+    score_enfriador_total = case_when(
+      enfriador_total >= lower_bound_enfriador_total & enfriador_total <= upper_bound_enfriador_total ~ 100,
+      enfriador_total >= (lower_bound_enfriador_total - 0.1 * (upper_bound_enfriador_total - lower_bound_enfriador_total)) &
+        enfriador_total <= (upper_bound_enfriador_total + 0.1 * (upper_bound_enfriador_total - lower_bound_enfriador_total)) ~ 50,
+      TRUE ~ 0
+    )
+  )
+
+# Verificar el resultado
+head(master_evaluado)
+```
+
+# Imputación de Territorio según coordenadas
+```{r}
+# Asegurándonos que SessionUID es del mismo tipo en ambos dataframes
+df_session$SessionUID <- as.character(df_session$SessionUId)
+master_evaluado$SessionUID <- as.character(master_evaluado$SessionUID)
+
+# Uniendo las coordenadas de df_session a master_calidad
+master_evaluado <- master_evaluado %>%
+  left_join(df_session %>% select(SessionUID, latitude, longitude),
+            by = "SessionUID")
+```
+
+----------- GUARDAR DATA PROCESADA
+
+```{r message=FALSE, warning=FALSE}
+# Obtener el mes y año actual automáticamente
+mes_actual <- format(Sys.Date(), "%B_%Y")
+
+# Leer o inicializar el archivo del mes
+archivo_csv_mes <- paste0("data_procesada/", mes_actual, ".csv")
+
+# Cargar datos del mes si el archivo existe, o crear un dataframe vacío si no existe
+if (file.exists(archivo_csv_mes)) {
+  datos_mes <- read_csv(archivo_csv_mes)
+} else {
+  datos_mes <- tibble() # Crear un tibble vacío
+}
+
+# Convertir todas las columnas comunes a character
+columns_to_convert <- intersect(names(master_evaluado), names(datos_mes))
+master_evaluado[columns_to_convert] <- lapply(master_evaluado[columns_to_convert], as.character)
+datos_mes[columns_to_convert] <- lapply(datos_mes[columns_to_convert], as.character)
+
+# Concatenar los datos nuevos con los antiguos
+datos_combinados <- bind_rows(master_evaluado, datos_mes)
+
+# Calcular la cantidad de NAs para cada fila antes de agrupar
+datos_combinados <- datos_combinados %>%
+  mutate(cantidad_na = rowSums(is.na(.)))
+
+# Seleccionar la entrada con menos NA para cada SessionUID
+datos_actualizados <- datos_combinados %>%
+  group_by(SessionUID) %>%
+  arrange(cantidad_na) %>%
+  slice(1) %>%
+  ungroup() %>%
+  select(-cantidad_na)
+
+# Guardar los datos actualizados en el archivo CSV del mes
+write_csv(datos_actualizados, archivo_csv_mes)
+
+# Mensaje de confirmación
+cat("Los datos para", mes_actual, "han sido actualizados y guardados en", archivo_csv_mes, "\n")
+```
+
+
+---------- LIMPIEZA DE DATA PROCESADA -------------
+```{r}
+library(tidyverse)
+library(readr)
+
+# Definir la carpeta donde se encuentran los datos
+folder_path <- "data_procesada"
+
+# Leer todos los archivos CSV en la carpeta
+files <- list.files(path = folder_path, pattern = "*.csv", full.names = TRUE)
+
+# Función para procesar cada archivo
+process_file <- function(file_path) {
+  # Leer el archivo
+  data <- read_csv(file_path)
+
+  # Calcular la cantidad de NAs y 0s por fila
+  data <- data %>%
+    mutate(cantidad_na = rowSums(is.na(.)),
+           cantidad_ceros = rowSums(. == 0, na.rm = TRUE))
+
+  # Combinar las cantidades de NAs y 0s para tener un criterio de selección
+  data <- data %>%
+    mutate(cantidad_na_ceros = cantidad_na + cantidad_ceros)
+
+  # Seleccionar la entrada con menos NA y 0 para cada SessionUID y eliminar los contadores
+  data <- data %>%
+    group_by(SessionUID) %>%
+    arrange(cantidad_na_ceros) %>%
+    slice(1) %>%
+    ungroup() %>%
+    select(-c(cantidad_na, cantidad_ceros, cantidad_na_ceros))
+
+  # Guardar el archivo procesado
+  write_csv(data, file_path)
+}
+
+# Aplicar la función a cada archivo
+walk(files, process_file)
+
+# Mensaje de confirmación
+cat("Todos los archivos en la carpeta", folder_path, "han sido procesados y limpiados considerando valores NA y 0.\n")
+```
+
+-----------EXTRACTOS-----------
+# Sabana de Calidad Madre
+```{r message=FALSE, warning=FALSE}
+# Ruta a la carpeta con los archivos procesados
+ruta_carpeta <- "data_procesada/"
+
+# Obtener lista de todos los archivos CSV en la carpeta
+archivos <- dir_ls(ruta_carpeta, regexp = "\\.csv$")
+
+# Función para leer un archivo CSV y asegurarse de que todas las columnas sean del mismo tipo
+leer_y_convertir <- function(archivo) {
+  df <- read_csv(archivo)
+  # Convertir todas las columnas a character para evitar conflictos
+  df[] <- lapply(df, as.character)
+  return(df)
+}
+
+# Leer cada archivo, convertir columnas y combinarlos en un solo dataframe
+master_calidad <- map_dfr(archivos, leer_y_convertir)
+
+# Asumiendo que master_calidad es tu dataframe
+master_calidad <- master_calidad %>%
+  mutate(
+    duration = as.numeric(duration),
+    distance = as.numeric(distance),
+    frentes_total = as.numeric(frentes_total),
+    frentes_arca = as.numeric(frentes_arca),
+    sovi = as.numeric(sovi),
+    flag_trigger = as.numeric(flag_trigger),
+    enfriador_total = as.numeric(enfriador_total),
+    score_frentes_total = as.numeric(score_frentes_total),
+    score_duration = as.numeric(score_duration),
+    score_enfriador_total = as.numeric(score_enfriador_total),
+    latitude = as.numeric(latitude),
+    longitude = as.numeric(longitude),
+    estatus = as.numeric(estatus),
+    promedio_frentes_total = as.numeric(promedio_frentes_total),
+    lower_bound_frentes_total = as.numeric(lower_bound_frentes_total),
+    upper_bound_frentes_total = as.numeric(upper_bound_frentes_total),
+    promedio_enfriador_total = as.numeric(promedio_enfriador_total),
+    lower_bound_enfriador_total = as.numeric(lower_bound_enfriador_total),
+    upper_bound_enfriador_total = as.numeric(upper_bound_enfriador_total),
+    promedio_duration = as.numeric(promedio_duration),
+    lower_bound_duration = as.numeric(lower_bound_duration),
+    upper_bound_duration = as.numeric(upper_bound_duration)
+  )
+
+# Guardar el dataframe combinado como un archivo CSV
+write_csv(master_calidad, paste0(ruta_carpeta, "master_calidad.csv"))
+
+# Mensaje de confirmación
+cat("El archivo 'master_calidad.csv' ha sido guardado con éxito en la carpeta '", ruta_carpeta, "'.\n", sep="")
+```
+
+------- BUSQUEDA ----------
+
+### Actual
+```{r}
+result_dplyr <- df_actual %>%
+  filter(SessionUID == "d5d287fa-89cf-4e4c-88ef-97dfbb46bc1a")
+
+# Mostrando el resultado
+print(result_dplyr)
+```
+
+```{r}
+summary(master_evaluado)
+```
+
+---------- DIVISION DE DATA POR MES -------------
+```{r message=FALSE, warning=FALSE}
+# Ruta al archivo Excel
+archivo_excel <- "ICD - Indice de Calidad de Data.xlsx"
+
+# Leer los datos de la pestaña "Data"
+df <- read_excel(archivo_excel, sheet = "Data")
+
+# Convertir la columna "Survey End Time" a tipo fecha
+df$Survey_End_Time <- as.Date(df$`Survey End Time`, format = "%m/%d/%Y")
+
+# Crear una columna con el mes y año
+df$Mes_Año <- format(df$Survey_End_Time, "%B_%Y")
+
+# Crear una carpeta para almacenar los datos procesados si no existe
+ruta_carpeta <- "data_procesada"
+if (!dir.exists(ruta_carpeta)) {
+  dir.create(ruta_carpeta, recursive = TRUE)
+  
+  # Verificar si la carpeta fue creada
+  if (!dir.exists(ruta_carpeta)) {
+    stop("La carpeta no pudo ser creada. Verifica los permisos.")
+  }
+}
+
+# Función para guardar los archivos CSV por mes
+guardar_csv_por_mes <- function(data, mes, ruta_carpeta) {
+  ruta_archivo <- file.path(ruta_carpeta, paste0(mes, ".csv"))
+  write.csv(data, ruta_archivo, row.names = FALSE)
+  cat("Archivo guardado:", ruta_archivo, "\n")
+}
+
+# Aplicar la función a cada mes
+lapply(unique(df$Mes_Año), function(mes) {
+  datos_mes <- filter(df, Mes_Año == mes)
+  if(nrow(datos_mes) > 0) {
+    guardar_csv_por_mes(datos_mes, mes, ruta_carpeta)
+  } else {
+    cat("No hay datos para el mes:", mes, "\n")
+  }
+})
+
+cat("Todos los archivos han sido creados.\n")
+```
+
+-------- QUERIES PERSONALIZADOS --------
+```{r}
+# Asegúrate de que 'Survey End Time' es de tipo Date
+master_evaluado$`Survey End Time` <- as.Date(master_evaluado$`Survey End Time`, format = "%Y-%m-%d")
+
+# Crear una nueva columna con la fecha del lunes de la semana correspondiente
+master_evaluado <- master_evaluado %>%
+  mutate(
+    start_of_week = floor_date(`Survey End Time`, unit = "week"),
+    week_label = format(start_of_week, "%d %b"),
+    week_order = as.numeric(start_of_week)
+  )
+
+# Agrupar por 'salesterritorycode' y 'week_label', y contar 'SessionUID' únicos
+conteo_semanal <- master_evaluado %>%
+  group_by(salesterritorycode, week_label) %>%
+  summarise(total_count = n_distinct(SessionUID), .groups = 'drop') %>%
+  ungroup()
+
+# Ordenar el dataframe por 'salesterritorycode' y 'week_order'
+# Nota: Es importante usar 'week_order' solo para ordenar antes del pivot_wider y no incluirlo en el pivot_wider para evitar duplicados.
+conteo_semanal <- conteo_semanal %>%
+  arrange(salesterritorycode, week_order)
+
+# Pivotar los datos para tener las etiquetas de semanas como columnas y 'salesterritorycode' como filas
+tabla_conteo_semanal <- conteo_semanal %>%
+  pivot_wider(
+    names_from = week_label,
+    values_from = total_count,
+    values_fill = list(total_count = 0)
+  )
+
+# Ordenar las columnas por fecha usando 'week_order' de 'master_evaluado'
+column_order <- unique(master_evaluado$week_label[order(master_evaluado$week_order)])
+tabla_conteo_semanal <- tabla_conteo_semanal %>%
+  select(salesterritorycode, all_of(column_order))
+
+# Guardar el dataframe en un archivo Excel
+write.xlsx(tabla_conteo_semanal, "/mnt/data/tabla_conteo_semanal.xlsx")
+```
+
+

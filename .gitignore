@@ -1,0 +1,23 @@
+# Ignorar archivos relacionados a la carga backlog de R
+ICD/fuentes_datos/.RData
+
+# Ignorar archivos relacionados a la carga backlog de DS
+.DS_Store
+
+# Ignorar archivos de bases de datos de clientes
+ICD/fuentes_datos/clientes/OMD Censo México NOV23.csv
+ICD/fuentes_datos/clientes/Catálogo Clientes MX TRAD + C&B.csv
+ICD/fuentes_datos/clientes/Clientes.csv
+ICD/fuentes_datos/clientes/Clientes.csv
+ICD/fuentes_datos/sku_master/Product Management10.17.23 05.37.csv
+ICD/fuentes_datos/comodato/Query_comodato_total____54423140.csv
+ICD/fuentes_datos/bases_extra/YDRAY-Master-Clientes-TRAD-CB---Agosto-2023.csv
+
+# Ignorar archivos de data procesada
+ICD/master_calidad.csv
+data_procesada/*
+
+# Ignorar data de parametros
+ICD/parametros.csv
+
+
