@@ -55,7 +55,11 @@ Este enfoque estructurado y detallado garantiza que el flujo de consumo de infor
 
 ## Bases de Datos Necesarias
 
-![Diagrama Entidad Relación de Data del Negocio](../src/business_entity.png)
+<p align="center">
+  <a href="../src/business_entity.png">
+    <img src="../src/business_entity.png" alt="Diagrama Entidad Relación de Data del Negocio" width="400">
+  </a>
+</p>
 
 Pending
 
