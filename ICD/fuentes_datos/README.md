@@ -57,7 +57,7 @@ Este enfoque estructurado y detallado garantiza que el flujo de consumo de infor
 
 <p align="center">
   <a href="../src/business_entity.png">
-    <img src="../src/business_entity.png" alt="Diagrama Entidad Relación de Data del Negocio" width="400">
+    <img src="../src/business_entity.png" alt="Diagrama Entidad Relación de Data del Negocio" width="600">
   </a>
 </p>
 
