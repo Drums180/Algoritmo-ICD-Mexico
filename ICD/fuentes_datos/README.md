@@ -43,7 +43,9 @@ El proceso de transformación se basa en dos tipos de entradas de datos para pro
 
 Siguiendo la metodología CRISP-DM, nuestro enfoque para el uso de datos se desarrolla en etapas, comenzando por comprender el negocio y la data específica del proyecto CENSO. Este entendimiento guía las fases subsecuentes de preparación, limpieza y transformación de los datos.
 
-![Diagrama de Metodología CRISP-DM](../src/crisp_dm.png)
+<p align="center">
+  <img src="../src/crisp_dm.png" alt="Diagrama de Metodología CRISP-DM" width="400">
+</p>
 
 Inicialmente, desarrollamos un compendio maestro de la información relevante para el negocio, unificando bases de datos y consolidando información que nos permite definir el contexto en el que opera el negocio y el proyecto. Este es el primer paso crítico para garantizar que los procesos de análisis y toma de decisiones estén bien fundamentados.
 
