@@ -47,7 +47,7 @@ El **Algoritmo de Calidad** se ha convertido en un componente esencial por varia
 
 - **Mejora continua:** El algoritmo permite una revisión constante de los procesos y estrategias de recopilación de datos, asegurando una mejora continua en la calidad de los datos recogidos.
 
-![ICD por Estado](ICD/src/ICD-Distribution.png)
+![Distribución ICD](ICD/src/ICD-Distribution.png)
 
 ## ¿Quién se beneficia del Algoritmo de Calidad?
 
