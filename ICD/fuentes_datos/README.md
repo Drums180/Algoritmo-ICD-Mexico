@@ -61,15 +61,27 @@ Este enfoque estructurado y detallado garantiza que el flujo de consumo de infor
   </a>
 </p>
 
-Pending
+El gráfico que has mencionado ilustra un diagrama entidad-relación (ER) que se centra en cómo se estructuran y se interconectan las bases de datos maestras dentro de una organización o proyecto. Estas bases de datos albergan información crucial que va desde los detalles de los clientes hasta los usuarios que están directamente involucrados en la ejecución de encuestas y censos.
+
+La importancia de este diagrama radica en su capacidad para mostrar la relación entre distintas entidades y cómo interactúan entre sí para asegurar la integridad y el flujo adecuado de información. Esto es fundamental para mantener la calidad y precisión de los datos, aspectos cruciales para el desempeño efectivo de cualquier algoritmo que dependa de estos datos.
+
+Para garantizar que se mantenga un orden y una estructura claros en estas bases de datos, es vital tener un glosario detallado que describa las variables (o columnas) asociadas a cada entidad. Además, es necesario desarrollar un modelo entidad-relación que detalle las conexiones entre las diversas bases de datos crudas, las cuales provienen originalmente de archivos en formato Parquet.
+
+Este enfoque permite una mejor gestión y análisis de los datos, facilitando la implementación de mejoras y la detección de errores en las bases de datos, lo que, a su vez, contribuye a la optimización continua del proceso de análisis de datos y la toma de decisiones basada en información precisa y actualizada.
 
 ### Master Clientes
 
 ### Bases extras
 
+las siguientes bases de datos ayudan a dar complejidad y profundidad a la sabana maestra de clientes asignando así información extra asociada a los clientes.
+
 - Como dato
+  nos dice la información referente a los articulos
+
 - OMD
+
 - Usuarios
+
 - Rutas
 
 ### SKU Master

@@ -264,7 +264,7 @@ df_survey <- df_survey %>%
 head(df_survey)
 ```
 
-### Coordenadas - ()
+### Coordenadas 
 Calculamos la distancia entre dos puntos geográficos utilizando la fórmula del haversine, que es esencial para entender la dispersión geográfica de las sesiones y clientes. Posteriormente, integramos datos de clientes para calcular estas distancias y identificar valores atípicos, los cuales se reemplazan por 0 para normalizar el análisis.
 
 ```{r}
@@ -316,8 +316,8 @@ print(outliers)
 head(df_session)
 ```
 
-### Frentes - (CHECK)
-Esta subsección evalúa la presencia y el tipo de productos en puntos de venta, calculando el número de frentes de productos propios y competidores. También determinamos el SOVI (Share of Voice Index), que mide la visibilidad de la marca en relación con los competidores.
+### Frentes
+Esta subsección evalúa la presencia y el tipo de productos en puntos de venta, calculando el número de frentes de productos propios y competidores. También determinamos el SOVI (Share of Visual Inventory), que mide la visibilidad de la marca en relación con los competidores.
 
 ```{r}
 frentes_df <- df_actual %>%
