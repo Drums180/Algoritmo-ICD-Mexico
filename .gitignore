@@ -23,5 +23,13 @@ ICD/master_metricas.xlsx
 
 # Ignorar data de parametros
 ICD/parametros.csv
-
-
+ICD/master_calidad.xlsx
+ICD/extracto_clientes.xlsx
+ICD/parametros.xlsx
+ICD/data_evaluada/mexico_icd3.csv
+ICD/fuentes_datos/bases_extra/YDRAY-Master-Clientes-TRAD-CB---Agosto-2023.xlsx
+ICD/fuentes_datos/clientes/Catálogo Clientes MX TRAD + C&B.xlsx
+ICD/fuentes_datos/clientes/Clientes.xlsx
+ICD/fuentes_datos/clientes/OMD Censo México NOV23.xlsx
+ICD/fuentes_datos/comodato/Query_comodato_total____54423140.xlsx
+ICD/fuentes_datos/sku_master/Product Management10.17.23 05.37.XLSX
