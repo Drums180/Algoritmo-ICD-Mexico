@@ -42,7 +42,7 @@ library(sf)       # Datos espaciales
 library(httr)     # Comunicación con APIs web
 library(jsonlite) # Trabajo con JSON
 library(ggplot2)  # Visualización de datos
-library(stringr)
+library(stringr)  # Modificación de texto
 ```
 
 ## Carga de Base de Datos
