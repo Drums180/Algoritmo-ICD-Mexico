@@ -16,5 +16,5 @@ def convert_parquet_to_csv(folder_path):
                 print(f"Archivo Parquet eliminado: {parquet_path}")
 
 
-base_folder = '/Users/daviddrums180/Arca Continental/CENSO ARCA/MEXICO/CENSO TRAD/parquets'
+base_folder = '/parquets'
 convert_parquet_to_csv(base_folder)
