@@ -42,7 +42,7 @@ library(sf)       # Datos espaciales
 library(httr)     # Comunicación con APIs web
 library(jsonlite) # Trabajo con JSON
 library(ggplot2)  # Visualización de datos
-library(stringr)
+library(stringr)  # Modificación de texto
 ```
 
 ## Carga de Base de Datos
@@ -170,9 +170,6 @@ read_all_files <- function(path) {
   return(dfs)
 }
 
-# Leer todos los archivos en fuentes_datos/clientes, excepto el de clientes que leeremos directamente
-all_dfs <- read_all_files("fuentes_datos/clientes")
-
 # Leer y limpiar los archivos Excel
 clientes_trad <- read_xlsx("fuentes_datos/clientes/Catálogo Clientes MX TRAD + C&B.xlsx") %>% limpiar_nombres()
 omd_censo <- read_xlsx("fuentes_datos/clientes/OMD Censo México NOV23.xlsx") %>% limpiar_nombres()
@@ -191,14 +188,8 @@ clientes_unicos <- clientes_combinados %>%
   arrange(desc(customercode)) %>% 
   distinct(customercode, .keep_all = TRUE)
 
-# Aplica limpiar nombres a las tablas en all_dfs
-all_dfs <- lapply(all_dfs, function(df) {
-  names(df) <- limpiar_nombres(names(df))
-  return(df)
-})
-
 # Tomar el dataframe 'mds' de all_dfs:
-mds <- all_dfs[["Clientes"]]  # Ajusta el nombre según corresponda si es diferente
+mds <- read_xlsx("fuentes_datos/clientes/Clientes.xlsx")
 
 # Elimina registros duplicados en mds basados en codigo_cliente
 mds <- mds %>%
