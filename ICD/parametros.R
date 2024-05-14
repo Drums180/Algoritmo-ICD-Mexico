@@ -161,7 +161,7 @@ parametros_unificados <- bounds_by_tamano_subcanal_frentes %>%
 # Mostrando los resultados
 print(parametros_unificados)
 
-## Parametros Generales
+## Creación de Parametros "Generales"
 # Calcular promedios y cuantiles para 'duration', 'frentes_total', 'enfriadores_total' y 'Scenes'
 promedios_por_tamano <- master_calidad %>%
   group_by(tamano) %>%
@@ -217,7 +217,7 @@ parametros_unificados <- bind_rows(parametros_unificados, general_por_tamano)
 # Mostrando los resultados
 tail(parametros_unificados)
 
-## Generales por Canal
+### Creación de Parametros "Generales" por Tradechannelcode
 # Calculando parámetros generales por cada tradechannelcode
 general_por_tradechannelcode <- master_calidad %>%
   filter(!is.na(tradechannelcode) & tradechannelcode != "NA") %>%
@@ -261,7 +261,8 @@ parametros_unificados <- distinct(parametros_unificados)
 # Mostrando los resultados
 tail(parametros_unificados)
 
-## Exportación
+
+### Exportar parametros
 # Ruta del archivo de destino
 ruta_destino <- "parametros.xlsx"
 
@@ -277,4 +278,3 @@ saveWorkbook(wb, ruta_destino, overwrite = TRUE)
 
 # Mensaje de confirmación
 cat("Datos exportados exitosamente a", ruta_destino)
-
